@@ -40,6 +40,28 @@ MBSworker ModbusServer::getWorker(uint8_t serverID, uint8_t functionCode) {
       }
     }
   }
+  else {
+    svmap = workerMap.find(ANY_SERVER_ID);
+    if (svmap != workerMap.end()) {
+      // Yes. Now look for the function code in the inner map
+      auto fcmap = svmap->second.find(functionCode);;
+      // Found it?
+      if (fcmap != svmap->second.end()) {
+        // Yes. Return the function pointer for it.
+        LOG_D("Worker found for ANY_SERVER %02X/%02X\n", serverID, functionCode);
+        return fcmap->second;
+        // No, no explicit worker found, but may be there is one for ANY_FUNCTION_CODE?
+      } else {
+        fcmap = svmap->second.find(ANY_FUNCTION_CODE);;
+        // Found it?
+        if (fcmap != svmap->second.end()) {
+          // Yes. Return the function pointer for it.
+          LOG_D("Worker found for ANY_SERVER %02X/ANY\n", serverID);
+          return fcmap->second;
+        }
+      }
+    }
+  }
   // No matching function pointer found
   LOG_D("No matching worker found\n");
   return nullptr;
@@ -57,13 +79,13 @@ bool ModbusServer::unregisterWorker(uint8_t serverID, uint8_t functionCode) {
     // Yes. we may proceed with it
     // Are we to look for a single serverID/FC combination?
     if (functionCode) {
-      // Yes. 
+      // Yes.
       numEntries = svmap->second.erase(functionCode);
     } else {
       // No, the serverID shall be removed with all references
       numEntries = workerMap.erase(serverID);
     }
-  } 
+  }
   LOG_D("Removed %d worker entries for %d/%d\n", numEntries, serverID, functionCode);
   return (numEntries ? true : false);
 }
@@ -75,16 +97,21 @@ bool ModbusServer::isServerFor(uint8_t serverID) {
   // Is it there? Then return true
   if (svmap != workerMap.end()) return true;
   // No, serverID was not found. Return false
+
+  svmap = workerMap.find(ANY_SERVER_ID);
+  // Is it there a wildcard worker? Then return true
+  if (svmap != workerMap.end()) return true;
+  // No, serverID was not found. Return false
   return false;
 }
 
 // getMessageCount: read number of messages processed
-uint32_t ModbusServer::getMessageCount() { 
+uint32_t ModbusServer::getMessageCount() {
   return messageCount;
 }
 
 // getErrorCount: read number of errors responded
-uint32_t ModbusServer::getErrorCount() { 
+uint32_t ModbusServer::getErrorCount() {
   return errorCount;
 }
 
